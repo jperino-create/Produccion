@@ -218,6 +218,8 @@ tr.drag-over-g td{border-top:3px solid var(--g2)!important}
 #flash{position:fixed;bottom:14px;right:14px;background:var(--ink);color:#fff;padding:8px 13px;border-radius:8px;font-size:11px;opacity:0;transform:translateY(4px);transition:all .2s;pointer-events:none;z-index:999;box-shadow:0 4px 14px rgba(0,0,0,.25)}
 #flash.on{opacity:1;transform:translateY(0)}
 #drag-hint{position:fixed;background:var(--ink);color:#fff;padding:6px 11px;border-radius:7px;font-size:11px;font-weight:600;z-index:9999;pointer-events:none;white-space:nowrap;box-shadow:0 3px 12px rgba(0,0,0,.35);transform:translate(14px,-50%);display:none}
+.team-manager{padding:20px;max-width:1500px;margin:auto;font-size:14px;color:#20352a}.team-manager header,.team-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.team-manager h2,.team-dialog h2{font-size:22px;margin:0 0 6px}.team-manager h3{font-size:16px;margin:0}.team-manager p,.team-dialog p{color:#5d6d64;line-height:1.6}.team-layout{display:grid;grid-template-columns:250px minmax(0,1fr);gap:20px;margin-top:20px}.team-layout aside,.team-layout main{background:white;border:1px solid #d8e2dc;border-radius:12px;padding:18px}.team-manager button,.team-dialog button{font:inherit;padding:10px 14px;border:1px solid #cddad2;background:#fff;color:#244632;border-radius:7px;cursor:pointer}.team-manager button:hover,.team-dialog button:hover{background:#edf5ef}.team-manager .primary,.team-dialog .primary{background:#1a5e28;color:#fff;border-color:#1a5e28}.team-layout aside button{display:flex;justify-content:space-between;gap:8px;width:100%;margin-top:10px;text-align:left;border-left:5px solid #1a5e28}.team-layout aside button.selected{background:#e9f3eb;font-weight:700}.team-manager label,.team-dialog label{display:flex;flex-direction:column;gap:7px;font-size:13px;font-weight:600}.team-search{display:grid;grid-template-columns:1fr 180px;gap:14px;margin:20px 0}.team-manager input,.team-manager select,.team-dialog input,.team-dialog select{font:inherit;border:1px solid #cddad2;border-radius:6px;padding:10px;background:white;color:#20352a;min-width:0;width:100%;box-sizing:border-box}.team-manager button:focus-visible,.team-dialog button:focus-visible,.team-manager input:focus,.team-dialog input:focus,.team-dialog select:focus{outline:2px solid #328647;outline-offset:2px}.team-table{overflow:auto}.team-table table{width:100%;border-collapse:collapse;font-size:14px}.team-table th{text-align:left;color:#5d6d64;font-size:12px;background:#f5f8f6}.team-table td,.team-table th{padding:14px 10px;border-bottom:1px solid #e4ece7}.team-table small{display:block;margin-top:5px;color:#5d6d64}.team-empty{padding:40px 20px;background:#f5f8f6;border-radius:8px;text-align:center}.team-dialog{width:min(600px,92vw);max-height:90vh;overflow:auto;border:1px solid #d8e2dc;border-radius:14px;padding:0;box-shadow:0 20px 80px #0003;color:#20352a;font:14px Arial,sans-serif}.team-dialog::backdrop{background:#10281b88}.team-dialog header,.team-dialog footer{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:20px;border-bottom:1px solid #e4ece7}.team-dialog footer{justify-content:flex-end;border-top:1px solid #e4ece7;border-bottom:0}.team-dialog section{padding:22px}.team-dialog label{margin-bottom:18px}.team-fields{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}.team-dialog input[type=color]{height:44px;width:100px;padding:4px}.team-dialog .danger,.team-error{color:#a32929}.team-error:empty{display:none}@media(max-width:750px){.team-layout{grid-template-columns:1fr}.team-layout aside{max-height:220px;overflow:auto}.team-search,.team-fields{grid-template-columns:1fr}.team-manager{padding:12px}.team-table td,.team-table th{padding:10px 6px}}
+
 </style>
 </head>
 <body>
@@ -912,7 +914,7 @@ function flash(msg){const el=document.getElementById('flash');el.textContent=msg
 // ============================================================
 // MODALES
 // ============================================================
-function openMo(id){document.getElementById(id)?.classList.add('on');}
+function openMo(id){if(id==='mo-pers'){editPers();return;}document.getElementById(id)?.classList.add('on');}
 function closeMo(id){document.getElementById(id)?.classList.remove('on');}
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){
@@ -1698,10 +1700,10 @@ function filterPerSearch(){
   const kwords=(SECTOR_ROL_KWORDS[sec]||[]);
   const selId=document.getElementById('om-per').value;
   // Prioridad 1: mismo sector por palabras clave en rol
-  const priori1=ST.personal.filter(p=>kwords.some(k=>(p.r||'').toLowerCase().includes(k)));
+  const priori1=ST.personal.filter(p=>p.activo!==false&&kwords.some(k=>(p.r||'').toLowerCase().includes(k)));
   // Prioridad 2: mismo área
-  const priori2=ST.personal.filter(p=>p.a===area&&!priori1.find(x=>x.id===p.id));
-  const otros=ST.personal.filter(p=>!priori1.find(x=>x.id===p.id)&&!priori2.find(x=>x.id===p.id));
+  const priori2=ST.personal.filter(p=>p.activo!==false&&p.a===area&&!priori1.find(x=>x.id===p.id));
+  const otros=ST.personal.filter(p=>p.activo!==false&&!priori1.find(x=>x.id===p.id)&&!priori2.find(x=>x.id===p.id));
   const priori=[...priori1,...priori2];
   const dd=document.getElementById('per-dd');if(!dd)return;
   const frags=['<div class="per-o" style="color:var(--ink3);font-style:italic;font-size:11px" data-pid="" data-pn="Sin asignar">Sin asignar</div>'];
@@ -1747,7 +1749,7 @@ function filterPerSearch(){
 // ============================================================
 // TAXONOMY — áreas de personal y sectores de producción
 // ============================================================
-const normName=s=>String(s||'').trim().toLocaleLowerCase('es');
+function normName(s){return String(s||'').trim().toLocaleLowerCase('es');}
 
 function getAreas(){return ST.areasPersonal||{};}
 function areaGroups(){return {...getAreas(),...(ST.personal.some(p=>!p.a)?{_sin_area:{l:'Sin área',c:'#68737d'}}:{})};}
@@ -1782,6 +1784,7 @@ function normalizeTaxonomy(state){
       state.sectores.push({id:'process_'+encodeURIComponent(name),nombre:name,color:def?.[2]||'#546e7a',areaId:def&&areas[def[1]]?def[1]:'',orden:state.sectores.length+1});
     }
   }
+  repairTeam(state);
   return state;
 }
 
@@ -1790,12 +1793,6 @@ function renameArea(id,name){
   if(!ST.areasPersonal[id]||!name)throw Error('Ingresá el nombre del área.');
   if(Object.entries(ST.areasPersonal).some(([k,a])=>k!==id&&normName(a.l)===normName(name)))throw Error('Ya existe un área con ese nombre.');
   ST.areasPersonal[id].l=name;
-}
-function deleteArea(id){
-  delete ST.areasPersonal[id];
-  for(const p of ST.personal||[])if(p.a===id)p.a='';
-  for(const s of ST.sectores||[])if(s.areaId===id)s.areaId='';
-  saveST();renderSectList();renderPers();flash('Área eliminada');
 }
 function renameSector(id,name){
   const s=ST.sectores.find(s=>s.id===id);
@@ -1825,35 +1822,7 @@ function renderSectList(){
   const areas=getAreas();
   const sects=getSectores();
 
-  // ÁREAS
-  const h1=document.createElement('h3');h1.textContent='Áreas de personal';h1.style.cssText='font-size:13px;font-weight:700;margin:0 0 4px';
-  const p1=document.createElement('p');p1.textContent='Agrupan al equipo en Personal → Equipo y Ocupación.';p1.style.cssText='font-size:11px;color:var(--ink3);margin-bottom:10px';
-  list.append(h1,p1);
-
-  for(const [id,a] of Object.entries(areas)){
-    const row=document.createElement('div');row.className='taxonomy-row';
-    const nameInp=document.createElement('input');nameInp.className='fi';nameInp.value=a.l;nameInp.style.flex='1';
-    nameInp.onchange=()=>{try{renameArea(id,nameInp.value);saveST();flash('✅ Área actualizada');}catch(e){nameInp.value=a.l;flash(e.message);}};
-    const colInp=document.createElement('input');colInp.type='color';colInp.value=a.c||'#455a64';
-    colInp.onchange=()=>{a.c=colInp.value;saveST();renderPers();};
-    const del=document.createElement('button');del.className='btn r';del.textContent='Eliminar';
-    del.onclick=()=>deleteArea(id);
-    row.append(nameInp,colInp,del);list.append(row);
-  }
-  // Nueva área
-  const newAreaRow=document.createElement('div');newAreaRow.className='taxonomy-row';newAreaRow.style.marginTop='8px';
-  const newAreaInp=document.createElement('input');newAreaInp.className='fi';newAreaInp.placeholder='Nueva área...';newAreaInp.style.flex='1';
-  const newAreaCol=document.createElement('input');newAreaCol.type='color';newAreaCol.value='#455a64';
-  const addAreaBtn=document.createElement('button');addAreaBtn.className='btn g';addAreaBtn.textContent='+ Agregar';
-  addAreaBtn.onclick=()=>{
-    const n=newAreaInp.value.trim();if(!n)return;
-    const id='area_'+Date.now();
-    if(!ST.areasPersonal)ST.areasPersonal={};
-    ST.areasPersonal[id]={l:n,c:newAreaCol.value};
-    saveST();newAreaInp.value='';renderSectList();renderPers();flash('✅ Área agregada');
-  };
-  newAreaRow.append(newAreaInp,newAreaCol,addAreaBtn);list.append(newAreaRow);
-
+  const manage=document.createElement('button');manage.className='btn';manage.textContent='Gestionar áreas y personal';manage.onclick=()=>{closeMo('mo-sect');setPV('equipo');};list.append(manage);
   // SECTORES
   const sep=document.createElement('div');sep.style.cssText='border-top:1px solid var(--line);margin:16px 0';
   const h2=document.createElement('h3');h2.textContent='Sectores de producción';h2.style.cssText='font-size:13px;font-weight:700;margin:0 0 4px';
@@ -1894,27 +1863,6 @@ function renderSectList(){
 // TAXONOMY — mantenido arriba
 // ============================================================
 
-function renderSectList(){
-  const list=document.getElementById('sect-list');if(!list)return;
-  const sects=getSectores();
-  if(!sects.length){list.innerHTML='<div style="padding:14px;text-align:center;color:var(--ink3);font-size:11px">Sin sectores. Agregá el primero.</div>';return;}
-  list.innerHTML=sects.map((s,i)=>
-    '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line2);font-size:11px">'+
-    '<div style="width:14px;height:14px;border-radius:3px;background:'+s.color+';flex-shrink:0"></div>'+
-    '<span style="flex:1;font-weight:600">'+s.nombre+'</span>'+
-    '<span style="font-size:10px;color:var(--ink3)">'+ST.personal.filter(p=>p.sector===s.id).length+' personas</span>'+
-    '<button class="btn xs r" data-del-sect="'+s.id+'">✕</button>'+
-    '</div>'
-  ).join('');
-  list.querySelectorAll('[data-del-sect]').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      if(confirm('¿Eliminar sector? Las personas quedarán sin sector.')){
-        ST.sectores=ST.sectores.filter(s=>s.id!==btn.dataset.delSect);
-        saveST();renderSectList();
-      }
-    });
-  });
-}
 
 function addSector(){
   const n=(document.getElementById('sect-new-n')?.value||'').trim();
@@ -1941,6 +1889,7 @@ function setPV(v){
 }
 
 function renderPers(){
+  repairTeam(ST);
   const act=nAct(),cap=capSem(),used=usedSem(CW),dif=cap-used;
   document.getElementById('cap-sum').innerHTML=
     '<div class="cap-c"><div class="cl">Operarios activos</div><div class="cv">'+act+'</div></div></td>'+    '<div class="cap-c"><div class="cl">Hs disponibles / sem</div><div class="cv">'+cap+'</div></div>'+
@@ -1980,165 +1929,9 @@ function renderPers(){
   }
 
   if(persView==='equipo')renderEquipo();
-  else renderOcupacion();
+  else renderAsignacion();
 }
 
-function renderEquipo(){
-  // Areas de personal — editables desde la UI
-  const areasConfig=ST.areasPersonal||{
-    fabricacion:{l:'Fabricación',c:'#1a5e28'},
-    suministro:{l:'Suministro',c:'#01579b'},
-    montaje:{l:'Pintura / Montaje',c:'#6a1b9a'}
-  };
-  const areas=areaGroups();
-  const hoy=TD;
-
-  // Construir mapa persona → tarea hoy y próxima tarea
-  function tareasHoyPers(pid){
-    const t=[];
-    ST.ops.forEach(op=>(op.operaciones||[]).forEach(s=>{
-      if(s.persona===pid&&s.start&&s.end&&hoy>=s.start&&hoy<=s.end) t.push({op,stg:s});
-    }));
-    return t;
-  }
-  function proxTareaPers(pid){
-    const opts=[];
-    ST.ops.forEach(op=>(op.operaciones||[]).forEach(s=>{
-      if(s.persona===pid&&s.start&&s.start>hoy) opts.push({op,stg:s});
-    }));
-    opts.sort((a,b)=>a.stg.start<b.stg.start?-1:1);
-    return opts[0]||null;
-  }
-  function pBar(pct){
-    return '<div style="display:flex;align-items:center;gap:5px">'+
-      '<div style="flex:1;height:6px;background:#eee;border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:var(--g);border-radius:3px"></div></div>'+
-      '<span style="font-size:10px;font-weight:600;color:var(--g);min-width:26px">'+pct+'%</span></div>';
-  }
-
-  const thStyle='padding:6px 10px;text-align:left;font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid var(--line);background:var(--paper);white-space:nowrap';
-  const tdStyle='padding:7px 10px;border-bottom:1px solid var(--line2);vertical-align:middle;font-size:11px';
-
-  let h='<div style="padding:0 14px 14px">';
-  Object.entries(areas).forEach(([k,v])=>{
-    const pers=ST.personal.filter(p=>p.a===k||(!p.a&&k==='fabricacion'));
-    if(!pers.length)return;
-    h+='<div style="margin-bottom:18px">';
-    // Cabecera de sector
-    h+='<div style="background:'+v.c+';color:#fff;padding:6px 12px;border-radius:6px 6px 0 0;display:flex;justify-content:space-between;align-items:center">';
-    h+='<div style="display:flex;align-items:center;gap:8px">'+
-       '<input type="color" value="'+v.c+'" data-area-color="'+k+'" title="Cambiar color" style="width:20px;height:20px;border:none;border-radius:3px;cursor:pointer;background:none;padding:0">'+
-       '<input type="text" value="'+v.l+'" data-area-name="'+k+'" style="background:transparent;border:none;color:#fff;font-size:12px;font-weight:700;outline:none;width:150px">'+
-       '</div>';
-    h+='<div style="display:flex;align-items:center;gap:8px">'+
-       '<span style="font-size:10px;opacity:.8">'+pers.length+' personas</span>'+
-       '<button data-del-area="'+k+'" style="background:rgba(0,0,0,.2);border:none;color:#fff;border-radius:4px;padding:2px 7px;cursor:pointer;font-size:10px">✕</button>'+
-       '</div>';
-    h+='</div>';
-    // Tabla
-    h+='<div style="border:1px solid var(--line);border-top:none;border-radius:0 0 6px 6px;overflow:hidden">';
-    h+='<table style="width:100%;border-collapse:collapse">';
-    h+='<thead><tr>'+
-      '<th style="'+thStyle+';width:160px">Operario</th>'+
-      '<th style="'+thStyle+'">OP hoy</th>'+
-      '<th style="'+thStyle+'">Etapa actual</th>'+
-      '<th style="'+thStyle+';width:130px">Avance</th>'+
-      '<th style="'+thStyle+'">Próxima tarea</th>'+
-      '<th style="'+thStyle+';width:80px"></th>'+
-    '</tr></thead><tbody>';
-
-    pers.forEach((p,pi)=>{
-      const tareas=tareasHoyPers(p.id);
-      const prox=proxTareaPers(p.id);
-      const rowBg=pi%2===0?'':'background:#fafafa';
-      if(!tareas.length){
-        h+='<tr style="'+rowBg+'">'+
-          '<td style="'+tdStyle+';font-weight:600">'+p.n+(p.coord?' <span style="font-size:8px;background:var(--g3);color:var(--g);padding:1px 4px;border-radius:3px">Coord.</span>':'')+'<br><span style="font-size:9px;color:var(--ink3)">'+p.r+'</span></td>'+
-          '<td style="'+tdStyle+';color:var(--ink3);font-style:italic">Sin asignación hoy</td>'+
-          '<td style="'+tdStyle+'">—</td>'+
-          '<td style="'+tdStyle+'">—</td>'+
-          '<td style="'+tdStyle+'">'+(prox?'<span style="font-weight:500">'+prox.stg.nombre+'</span><br><span style="font-size:9px;color:var(--ink3)">OP '+prox.op.op+' · desde '+fmtD(prox.stg.start)+'</span>':'<span style="color:var(--ink3);font-size:10px">—</span>')+'</td>'+
-          '<td style="'+tdStyle+'">'+
-            '<div style="display:flex;gap:3px">'+
-            '<button data-eid="'+p.id+'" data-act="edit" class="btn xs">✏</button>'+
-            '<button data-eid="'+p.id+'" data-act="del" class="btn xs r">🗑</button>'+
-            '</div></td>'+
-        '</tr>';
-      } else {
-        tareas.forEach((t,ti)=>{
-          const late=t.stg.end<hoy&&t.stg.estado!=='Terminado';
-          h+='<tr style="'+rowBg+'">';
-          if(ti===0){
-            h+='<td rowspan="'+tareas.length+'" style="'+tdStyle+';font-weight:600;border-right:1px solid var(--line2)">'+
-              p.n+(p.coord?' <span style="font-size:8px;background:var(--g3);color:var(--g);padding:1px 4px;border-radius:3px">Coord.</span>':'')+'<br>'+
-              '<span style="font-size:9px;color:var(--ink3)">'+p.r+'</span>'+
-            '</td>';
-          }
-          h+='<td style="'+tdStyle+';font-weight:700">'+t.op.op+'<br><span style="font-size:9px;color:var(--ink3);font-weight:400">'+t.op.desc.split(' - ').slice(1).join(' ').substring(0,30)+'</span></td>';
-          h+='<td style="'+tdStyle+'"><span style="font-weight:500">'+t.stg.nombre+'</span>'+
-            (late?'<br><span style="font-size:9px;color:var(--r);font-weight:700">DEMORADA</span>':
-            '<br><span style="font-size:9px;color:var(--ink3)">Fin: '+fmtD(t.stg.end)+'</span>')+'</td>';
-          h+='<td style="'+tdStyle+'">'+pBar(t.stg.pct||0)+'</td>';
-          if(ti===0){
-            h+='<td rowspan="'+tareas.length+'" style="'+tdStyle+'">'+(prox?
-              '<span style="font-weight:500">'+prox.stg.nombre+'</span><br><span style="font-size:9px;color:var(--ink3)">OP '+prox.op.op+' · desde '+fmtD(prox.stg.start)+'</span>':
-              '<span style="color:var(--ink3);font-size:10px">—</span>')+'</td>';
-            h+='<td rowspan="'+tareas.length+'" style="'+tdStyle+'">';
-            h+='<div style="display:flex;gap:3px">'+
-              '<button data-eid="'+p.id+'" data-act="edit" class="btn xs">✏</button>'+
-              '<button data-eid="'+p.id+'" data-act="del" class="btn xs r">🗑</button>'+
-              '</div></td>';
-          }
-          h+='</tr>';
-        });
-      }
-    });
-    h+='</tbody></table></div></div>';
-  });
-  // Botón agregar nueva área
-  h+='<div style="margin-top:10px;padding:10px 0">';
-  h+='<button class="btn sm" onclick="addArea()">+ Agregar área</button>';
-  h+='</div>';
-  h+='</div>';
-
-  const pb=document.getElementById('p-body');
-  pb.innerHTML=h;
-  pb.addEventListener('click',e=>{
-    const btn=e.target.closest('[data-act]');if(!btn)return;
-    if(btn.dataset.act==='edit')editPers(btn.dataset.eid);
-    else if(btn.dataset.act==='del')delPers(btn.dataset.eid);
-  });
-
-  // Editar nombre de área
-  pb.querySelectorAll('[data-area-name]').forEach(inp=>{
-    inp.addEventListener('change',()=>{
-      const k=inp.dataset.areaName;
-      if(!ST.areasPersonal)ST.areasPersonal={};
-      if(!ST.areasPersonal[k])ST.areasPersonal[k]={};
-      ST.areasPersonal[k].l=inp.value;
-      saveST();
-    });
-  });
-
-  // Eliminar área
-  pb.querySelectorAll('[data-del-area]').forEach(btn=>{
-    btn.addEventListener('click',e=>{
-      e.stopPropagation();
-      deleteArea(btn.dataset.delArea);
-    });
-  });
-
-  // Editar color de área
-  pb.querySelectorAll('[data-area-color]').forEach(inp=>{
-    inp.addEventListener('input',()=>{
-      const k=inp.dataset.areaColor;
-      if(!ST.areasPersonal)ST.areasPersonal={};
-      if(!ST.areasPersonal[k])ST.areasPersonal[k]={};
-      ST.areasPersonal[k].c=inp.value;
-      saveST();
-      renderEquipo(); // refrescar con nuevo color
-    });
-  });
-}
 
 function renderOcupacion(){
   const sems=getSems(8);
@@ -2179,7 +1972,7 @@ function renderOcupacion(){
   h+='</tr></thead><tbody>';
 
   Object.entries(areas).forEach(([akey,av])=>{
-    const ap=ST.personal.filter(p=>p.a===akey||(!p.a&&akey==='fabricacion'));if(!ap.length)return;
+    const ap=ST.personal.filter(p=>p.a===akey||(!p.a&&akey==='_sin_area'));if(!ap.length)return;
     h+='<tr><td colspan="'+(allDays.length+1)+'" style="background:'+av.c+';color:#fff;font-size:10px;font-weight:700;padding:4px 10px;border:1px solid '+av.c+'">'+av.l+'</td></tr>';
     ap.forEach(p=>{
       h+='<tr><td style="position:sticky;left:0;background:#fff;z-index:2;padding:5px 10px;border:1px solid var(--line2);white-space:nowrap"><b style="font-size:11px">'+p.n+'</b><br><small style="font-size:9px;color:var(--ink3)">'+p.r+'</small></td>';
@@ -2205,54 +1998,9 @@ function renderOcupacion(){
   pb.addEventListener('click',e=>{const td=e.target.closest('[data-occ-op]');if(td)openOM(td.dataset.occOp,td.dataset.occStg);},{once:true});
 }
 
-function editPers(id){
-  const p=ST.personal.find(x=>x.id===id);if(!p)return;
-  document.getElementById('ep-id').value=id;
-  document.getElementById('p-n').value=p.n;
-  document.getElementById('p-r').value=p.r;
-  document.getElementById('p-co').value=p.coord?'si':'no';
-  refreshSectSelect(p.a||'fabricacion');
-  document.getElementById('mo-pers-t').textContent='Editar persona';
-  document.getElementById('mo-pers-save').textContent='Guardar';
-  document.getElementById('mo-pers-save').onclick=saveEditPers;
-  const mf=document.getElementById('mo-pers-f');
-  if(!document.getElementById('del-pers-btn')){
-    const db=document.createElement('button');db.id='del-pers-btn';db.className='btn r';db.style.marginRight='auto';db.textContent='🗑 Eliminar';
-    db.onclick=()=>{if(confirm('¿Eliminar?')){delPers(document.getElementById('ep-id').value);closeMo('mo-pers');}};
-    mf.prepend(db);
-  }
-  refreshSectSelect();
-  openMo('mo-pers');
-}
 
-function saveEditPers(){
-  const id=document.getElementById('ep-id').value;
-  const p=ST.personal.find(x=>x.id===id);if(!p)return;
-  p.n=document.getElementById('p-n').value;
-  p.r=document.getElementById('p-r').value;
-  p.a=document.getElementById('p-a').value;
-  p.coord=document.getElementById('p-co').value==='si';
-  saveST();renderPers();closeMo('mo-pers');flash('✅ Operario actualizado');
-}
 
-function delPers(id){
-  const p=ST.personal.find(x=>x.id===id);
-  if(!confirm('¿Eliminar a '+(p?p.n:id)+'? Las etapas asignadas quedarán sin persona.'))return;
-  ST.personal=ST.personal.filter(x=>x.id!==id);
-  ST.ops.forEach(op=>(op.operaciones||[]).forEach(s=>{if(s.persona===id)s.persona=null;}));
-  saveST();renderPers();flash('Operario eliminado');
-  saveST();renderPers();flash('Operario eliminado');
-}
 
-function savePers(){
-  const n=(document.getElementById('p-n').value||'').trim();if(!n)return;
-  document.getElementById('ep-id').value='';
-  document.getElementById('mo-pers-save').textContent='Agregar';
-  document.getElementById('mo-pers-save').onclick=savePers;
-  const db=document.getElementById('del-pers-btn');if(db)db.remove();
-  ST.personal.push({id:'p'+Date.now(),n,r:document.getElementById('p-r').value,a:document.getElementById('p-a').value,coord:document.getElementById('p-co').value==='si',activo:true});
-  saveST();renderPers();closeMo('mo-pers');flash('Persona agregada');
-}
 
 // ============================================================
 // INFORME DIARIO
@@ -2511,26 +2259,7 @@ function onMaqSel(){
   if(m)document.getElementById('f-desc').value=m.c+' - '+m.d;
 }
 
-function addArea(){
-  const n=prompt('Nombre del área:');
-  if(!n||!n.trim())return;
-  const id='area_'+Date.now();
-  const colors=['#1a5e28','#01579b','#6a1b9a','#b71c1c','#e65100','#00695c','#37474f'];
-  const usedColors=Object.values(ST.areasPersonal||{}).map(a=>a.c);
-  const c=colors.find(c=>!usedColors.includes(c))||'#455a64';
-  if(!ST.areasPersonal)ST.areasPersonal={};
-  ST.areasPersonal[id]={l:n.trim(),c};
-  saveST();renderEquipo();flash('✅ Área agregada');
-}
 
-function deleteArea(k){
-  const area=(ST.areasPersonal||{})[k];
-  const nombre=area?.l||k;
-  const nPersonas=ST.personal.filter(p=>p.a===k).length;
-  if(!confirm('¿Eliminar área "'+nombre+'"?'+(nPersonas?' Los '+nPersonas+' operarios quedarán sin área.':'')))return;
-  delete ST.areasPersonal[k];
-  saveST();renderEquipo();flash('Área eliminada');
-}
 
 function refreshSectSelect(selected){
   const sel=document.getElementById('p-a');if(!sel)return;
@@ -3578,7 +3307,7 @@ function renderAsignacion(){
   tbl+='</tr></thead><tbody>';
 
   Object.entries(areas).forEach(([akey,av])=>{
-    const ap=ST.personal.filter(p=>p.a===akey||(!p.a&&akey==='fabricacion'));
+    const ap=ST.personal.filter(p=>p.a===akey||(!p.a&&akey==='_sin_area'));
     if(!ap.length)return;
     tbl+='<tr><td colspan="'+(allDays.length+1)+'" style="background:'+av.c+';color:#fff;font-size:10px;font-weight:700;padding:4px 10px;border:1px solid '+av.c+'">'+av.l+'</td></tr>';
     ap.forEach(p=>{
@@ -4225,6 +3954,103 @@ window.addEventListener('load', () => {
 
 // ============================================================
 // INIT
+// Gestión central de áreas y personas. Mantiene los identificadores existentes.
+var teamFilter={area:'*',query:'',status:'all'};
+function teamEscape(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function repairTeam(state){
+  state.personal=state.personal||[];state.areasPersonal=state.areasPersonal||{};
+  const areas=state.areasPersonal;
+  for(const p of state.personal){
+    if(!p.a||Object.hasOwn(areas,p.a))continue;
+    const sector=(state.sectores||[]).find(s=>s.id===p.a);
+    const match=Object.entries(areas).find(([,a])=>normName(a.l)===normName(p.a)||sector&&normName(a.l)===normName(sector.nombre));
+    if(match)p.a=match[0];
+    else if(sector?.areaId&&Object.hasOwn(areas,sector.areaId))p.a=sector.areaId;
+    else Object.defineProperty(areas,p.a,{value:{l:sector?.nombre||'Área recuperada · '+p.a,c:sector?.color||'#607d8b'},enumerable:true,writable:true,configurable:true});
+  }
+  return state;
+}
+function teamOptions(selected='',exclude=''){
+  return '<option value="">Sin área</option>'+Object.entries(getAreas()).filter(([id])=>id!==exclude).map(([id,a])=>'<option value="'+teamEscape(id)+'"'+(id===selected?' selected':'')+'>'+teamEscape(a.l)+'</option>').join('');
+}
+function teamCommit(change){
+  const next=JSON.parse(JSON.stringify(ST));change(next);
+  // No anunciar éxito ni sustituir el estado si falla la escritura local.
+  localStorage.setItem('tt_v6',JSON.stringify(next));ST=next;
+  renderPers();refreshSectSelect();
+  flash('Guardado en este navegador');
+  if(typeof gcToken!=='undefined'&&gcToken)saveToSheets();
+}
+function teamDialog(title,body,onSubmit){
+  document.getElementById('team-dialog')?.remove();
+  const dialog=document.createElement('dialog');dialog.id='team-dialog';dialog.className='team-dialog';
+  dialog.innerHTML='<form><header><h2>'+teamEscape(title)+'</h2><button type="button" aria-label="Cerrar">×</button></header><section>'+body+'<p class="team-error" role="alert"></p></section><footer><button type="button">Cancelar</button><button class="primary" type="submit">Guardar cambios</button></footer></form>';
+  document.body.append(dialog);
+  dialog.querySelectorAll('button[type="button"]').forEach(b=>b.onclick=()=>dialog.close());
+  dialog.addEventListener('close',()=>dialog.remove());
+  dialog.querySelector('form').onsubmit=e=>{e.preventDefault();try{if(onSubmit(new FormData(e.target))!==false)dialog.close();}catch(err){dialog.querySelector('.team-error').textContent=err.message;}};
+  dialog.showModal();return dialog;
+}
+function editArea(id=''){
+  repairTeam(ST);const a=getAreas()[id];
+  const dialog=teamDialog(a?'Editar área':'Crear área','<label>Nombre del área<input name="name" required maxlength="80" value="'+teamEscape(a?.l||'')+'" placeholder="Ej.: Logística"></label><label>Color del área<input type="color" name="color" value="'+(/^#[0-9a-f]{6}$/i.test(a?.c)?a.c:'#1a5e28')+'"></label><p>El nombre y el color se actualizan en Equipo, Ocupación y los selectores de área. Los sectores de producción se vinculan a estas áreas.</p>'+(a?'<button type="button" class="danger" id="team-delete-area">Eliminar y reasignar…</button>':''),data=>{
+    const name=data.get('name').trim();if(!name)throw Error('Ingresá un nombre.');
+    if(Object.entries(getAreas()).some(([key,value])=>key!==id&&normName(value.l)===normName(name)))throw Error('Ya existe un área con ese nombre.');
+    const key=id||'area_'+crypto.randomUUID();
+    teamCommit(next=>{next.areasPersonal[key]={...(next.areasPersonal[key]||{}),l:name,c:data.get('color')};});
+  });
+  const del=dialog.querySelector('#team-delete-area');if(del)del.onclick=()=>{dialog.close();deleteArea(id);};
+}
+function addArea(){editArea();}
+function deleteArea(id){
+  const area=getAreas()[id];if(!area)return;
+  const count=ST.personal.filter(p=>p.a===id).length;
+  const sectors=(ST.sectores||[]).filter(s=>s.areaId===id).length;
+  teamDialog('Eliminar '+area.l,'<p>Hay '+count+' personas y '+sectors+' sectores vinculados. Se conservarán y pasarán al destino que elijas.</p><label>Área de destino<select name="target">'+teamOptions('',id)+'</select></label><p>«Sin área» mantiene las personas visibles para asignarlas después.</p>',data=>{
+    const target=data.get('target');
+    if(target&&!Object.hasOwn(getAreas(),target))throw Error('El área de destino ya no existe.');
+    teamCommit(next=>{for(const p of next.personal)if(p.a===id)p.a=target;for(const s of next.sectores||[])if(s.areaId===id)s.areaId=target;delete next.areasPersonal[id];});
+    teamFilter.area='*';renderEquipo();
+  });
+}
+function editPers(id=''){
+  repairTeam(ST);closeMo('mo-pers');const p=ST.personal.find(x=>x.id===id);
+  if(id&&!p)return;
+  const area=p?(p.a||''):(teamFilter.area!=='*'?teamFilter.area:'');
+  teamDialog(p?'Editar persona':'Crear persona','<div class="team-fields"><label>Nombre y apellido<input name="name" required maxlength="100" autocomplete="off" value="'+teamEscape(p?.n||'')+'"></label><label>Rol / función<input name="role" maxlength="120" value="'+teamEscape(p?.r||'')+'"></label><label>Área<select name="area">'+teamOptions(area)+'</select></label><label>Coordinador<select name="coord"><option value="no">No</option><option value="si"'+(p?.coord?' selected':'')+'>Sí</option></select></label><label>Estado<select name="active"><option value="yes">Activo</option><option value="no"'+(p?.activo===false?' selected':'')+'>Inactivo</option></select></label></div><p>Las personas inactivas conservan su historial y no se ofrecen para nuevas asignaciones. Para desactivar una persona, primero quitá sus tareas pendientes desde Ocupación.</p>',data=>{
+    const name=data.get('name').trim(),area=data.get('area'),active=data.get('active')==='yes';
+    if(!name)throw Error('Ingresá el nombre y apellido.');
+    if(ST.personal.some(x=>x.id!==id&&normName(x.n)===normName(name)))throw Error('Ya existe una persona con ese nombre. Buscala y editá su ficha.');
+    if(area&&!Object.hasOwn(getAreas(),area))throw Error('El área seleccionada ya no existe.');
+    if(p&& !active && teamPending(p.id))throw Error('Esta persona tiene tareas pendientes. Quitá su asignación antes de desactivarla.');
+    teamCommit(next=>{let person=next.personal.find(x=>x.id===id);if(!person){person={id:'p_'+crypto.randomUUID()};next.personal.push(person);}Object.assign(person,{n:name,r:data.get('role').trim(),a:area,coord:data.get('coord')==='si',activo:active});});
+  });
+}
+function teamPending(id){
+  const pending=t=>stgPers(t).includes(id)&&!['listo','terminado','terminada','completado','completada','finalizado','finalizada'].includes(normName(t.est||t.estado))&&Number(t.avance??t.pct??0)<100;
+  return ST.ops.some(op=>(op.operaciones||[]).some(pending)||(op.conjuntos||[]).some(c=>Object.values(c.procConfig||{}).some(pending)));
+}
+function delPers(id){editPers(id);}
+function savePers(){editPers();}
+function saveEditPers(){editPers(document.getElementById('ep-id')?.value||'');}
+function renderEquipo(){
+  repairTeam(ST);const host=document.getElementById('p-body');if(!host)return;
+  if(teamFilter.area!=='*'&&teamFilter.area&&!Object.hasOwn(getAreas(),teamFilter.area))teamFilter.area='*';
+  const areaButtons=[['*',{l:'Todas las personas',c:'#1a5e28'}],...Object.entries(getAreas()),['',{l:'Sin área',c:'#607d8b'}]];
+  host.innerHTML='<div class="team-manager"><header><div><h2>Áreas y personal</h2><p>Organizá el equipo y mantené sus datos actualizados.</p></div><div class="team-actions"><button data-new-area>+ Crear área</button><button class="primary" data-new-person>+ Crear persona</button></div></header><div class="team-layout"><aside><h3>Áreas</h3>'+areaButtons.map(([id,a])=>'<button data-area="'+teamEscape(id)+'" class="'+(teamFilter.area===id?'selected':'')+'"><span>'+teamEscape(a.l)+'</span><small>'+ST.personal.filter(p=>id==='*'||(p.a||'')===id).length+'</small></button>').join('')+'</aside><main><div class="team-actions"><h3>'+teamEscape(teamFilter.area==='*'?'Todo el equipo':getAreas()[teamFilter.area]?.l||'Sin área')+'</h3>'+(getAreas()[teamFilter.area]?'<button data-edit-area>Editar área y color</button>':'')+'</div><div class="team-search"><label>Buscar persona o función<input id="team-query" type="search" placeholder="Nombre, apellido o función" value="'+teamEscape(teamFilter.query)+'"></label><label>Estado<select id="team-status"><option value="all">Todos</option><option value="active">Activos</option><option value="inactive">Inactivos</option></select></label></div><div id="team-results"></div></main></div></div>';
+  host.querySelectorAll('[data-area]').forEach(b=>{const a=areaButtons.find(([id])=>id===b.dataset.area)?.[1];b.style.borderLeftColor=a?.c||'#607d8b';b.onclick=()=>{teamFilter.area=b.dataset.area;renderEquipo();};});
+  host.querySelector('[data-new-area]').onclick=addArea;host.querySelector('[data-new-person]').onclick=()=>editPers();
+  const edit=host.querySelector('[data-edit-area]');if(edit)edit.onclick=()=>editArea(teamFilter.area);
+  host.querySelector('#team-query').oninput=e=>{teamFilter.query=e.target.value;teamResults();};
+  const status=host.querySelector('#team-status');status.value=teamFilter.status;status.onchange=()=>{teamFilter.status=status.value;teamResults();};teamResults();
+}
+function teamResults(){
+  const q=normName(teamFilter.query),rows=ST.personal.filter(p=>(teamFilter.area==='*'||(p.a||'')===teamFilter.area)&&(!q||normName(p.n+' '+p.r).includes(q))&&(teamFilter.status==='all'||(p.activo!==false)===(teamFilter.status==='active'))).sort((a,b)=>a.n.localeCompare(b.n,'es'));
+  const el=document.getElementById('team-results');if(!el)return;
+  el.innerHTML='<p>'+rows.length+' personas encontradas</p>'+(rows.length?'<div class="team-table"><table><thead><tr><th>Persona</th><th>Área</th><th>Estado</th><th></th></tr></thead><tbody>'+rows.map(p=>'<tr><td><strong>'+teamEscape(p.n)+'</strong><small>'+teamEscape(p.r||'Sin función indicada')+(p.coord?' · Coordinador':'')+'</small></td><td>'+teamEscape(getAreas()[p.a]?.l||'Sin área')+'</td><td>'+(p.activo===false?'Inactivo':'Activo')+'</td><td><button data-person="'+teamEscape(p.id)+'" aria-label="Editar '+teamEscape(p.n)+'">Editar</button></td></tr>').join('')+'</tbody></table></div>':'<div class="team-empty">No hay personas para estos filtros. Podés cambiar la búsqueda o crear una persona.</div>');
+  el.querySelectorAll('[data-person]').forEach(b=>b.onclick=()=>editPers(b.dataset.person));
+}
+
 // ============================================================
 // La app arranca en el login — no renderizar hasta que el usuario ingrese
 // renderMaqList() y renderGantt() se llaman desde doLogin()
