@@ -3015,6 +3015,9 @@ function openCjConfig(opId, ci){
     const sp=document.createElement('span');sp.textContent=p;sp.style.fontWeight=sel2?'700':'400';
     lbl.append(cb,sp);procsEl.append(lbl);
   });
+  renderProcRows(cj);
+  renderSubList(cj);
+  openMo('mo-cj');
 }
 function toggleProcRow(cb){
   // Actualizar visual del label
