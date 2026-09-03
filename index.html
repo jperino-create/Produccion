@@ -557,7 +557,7 @@ tr.drag-over-g td{border-top:3px solid var(--g2)!important}
     </div>
     <div class="f3">
       <div class="field"><label>Fecha inicio</label><input class="fi" id="om-s" type="date" oninput="recalcOM()"></div>
-      <div class="field"><label>Días hábiles</label><input class="fi" id="om-d" type="number" min="1" oninput="recalcOM()"></div>
+      <div class="field"><label>Duración de trabajo</label><div style="display:flex;gap:6px"><input class="fi" id="om-d" type="number" min="0.01" step="any" oninput="recalcOM()"><select class="fi" id="om-unit" onchange="recalcOM()"><option value="days">Días hábiles</option><option value="hours">Horas</option></select></div><small>Por persona · 1 día = 8 h</small></div>
       <div class="field"><label>Fecha fin</label><input class="fi" id="om-e" type="date" readonly style="background:var(--paper)"></div>
     </div>
     <div class="f2">
@@ -1452,6 +1452,16 @@ function initRowDrag(){
 function openOM(opId,stgId){
   const op=ST.ops.find(o=>o.id===opId);if(!op)return;
   const stg=(op.operaciones||[]).find(s=>s.id===stgId);
+  if(stg?.fromConjuntos){
+    const choices=[];
+    (op.conjuntos||[]).forEach((cj,ci)=>(cj.procesos||[]).forEach(proc=>{if(proc===stg.nombre||proc===stg.sector)choices.push({cj,ci,proc});}));
+    if(choices.length===1){openPendingTask(opId,choices[0].ci,choices[0].proc);return;}
+    if(choices.length>1){
+      const dlg=teamDialog('Elegí el conjunto','<p>Este proceso reúne varios conjuntos. Editá sus horas por separado.</p>'+choices.map((x,i)=>'<button type="button" data-choice="'+i+'">'+teamEscape(x.cj.cod+' · '+x.cj.desc)+'</button>').join(''),()=>false);
+      dlg.querySelector('button[type="submit"]').hidden=true;
+      dlg.querySelectorAll('[data-choice]').forEach(b=>b.onclick=()=>{const x=choices[Number(b.dataset.choice)];dlg.close();openPendingTask(opId,x.ci,x.proc);});return;
+    }
+  }
   omCtx={opId,stgId,origStart:stg?.start,origEnd:stg?.end,origDias:stg?.dias};
 
   // Buscar si esta etapa tiene un conjunto vinculado
@@ -1467,6 +1477,8 @@ function openOM(opId,stgId){
   document.getElementById('om-cod').value=stg?.cod||'';
   document.getElementById('om-s').value=stg?.start||'';
   document.getElementById('om-d').value=stg?.dias||3;
+  document.getElementById('om-unit').value=stg?.durationUnit||'days';
+  if(stg?.durationUnit==='hours')document.getElementById('om-d').value=stg.workHours;
   document.getElementById('om-e').value=stg?.end||'';
   document.getElementById('om-ej').value=stg?.ejecucion||'interno';
   document.getElementById('om-est').value=stg?.estado||'Pendiente';
@@ -1520,11 +1532,26 @@ function addStg(opId){
 
 function closeOM(){document.getElementById('om-ov').classList.remove('on');omCtx=null;}
 
+function workDuration(value,unit){
+  const n=Number(value);
+  if(!Number.isFinite(n)||n<=0||n>80000)throw Error('Ingresá una duración mayor que cero (máximo 80.000).');
+  if(unit!=='hours'&&!Number.isInteger(n))throw Error('Los días deben ser enteros; usá Horas para duraciones parciales.');
+  return {durationUnit:unit==='hours'?'hours':'days',workHours:unit==='hours'?n:n*8,dias:unit==='hours'?Math.ceil(n/8):n};
+}
+function workSlots(task){
+  if(!task.start)return [];
+  let left=task.durationUnit==='hours'?Number(task.workHours):(Number(task.dias)||1)*8;if(!Number.isFinite(left)||left<=0||left>640000)return [];
+  let day=task.start;if(isWE(day))day=addHab(day,1);
+  const slots=[];while(left>0){const h=Math.min(8,left);slots.push({day,h});left=Math.round((left-h)*1e6)/1e6;if(left>0)day=addHab(day,1);}return slots;
+}
+function workEnd(start,duration){
+  return workSlots({...duration,start}).at(-1)?.day||start;
+}
 function recalcOM(){
   const s=document.getElementById('om-s').value;
-  const d=parseInt(document.getElementById('om-d').value)||0;
-  if(s&&d){
-    const e=addHab(s,d);
+  let duration;try{duration=workDuration(document.getElementById('om-d').value,document.getElementById('om-unit').value);}catch(e){document.getElementById('om-e').value='';return;}
+  if(s){
+    const e=workEnd(s,duration);
     document.getElementById('om-e').value=e;
     if(omCtx?.origStart&&omCtx?.origEnd){
       const diff=habDays(s,e)-habDays(omCtx.origStart,omCtx.origEnd);
@@ -1563,7 +1590,8 @@ function saveOM(){
   const personaId=personasArr[0]||null; // compatibilidad
 
   const newStart=document.getElementById('om-s').value;
-  const newEnd=document.getElementById('om-e').value||addHab(newStart,parseInt(document.getElementById('om-d').value)||3);
+  let duration;try{duration=workDuration(document.getElementById('om-d').value,document.getElementById('om-unit').value);if(!newStart)throw Error('Ingresá la fecha de inicio.');}catch(e){flash(e.message);return;}
+  const newEnd=workEnd(newStart,duration);
   const diasDiff=habDays(newStart,newEnd)-(omCtx.origEnd&&omCtx.origStart?habDays(omCtx.origStart,omCtx.origEnd):0);
   const dvVal=document.querySelector('input[name="dv"]:checked')?.value||'cascada';
   const newObs=document.getElementById('om-obs').value;
@@ -1575,15 +1603,15 @@ function saveOM(){
     cod:document.getElementById('om-cod')?.value||'',
     sector:document.getElementById('om-sec').value,
     start:newStart,end:newEnd,
-    dias:parseInt(document.getElementById('om-d').value)||3,
-    personas:personasActuales,
+    ...duration,
+    personas:personasArr.slice(),
     persona:null, // migrado a personas
     ejecucion:document.getElementById('om-ej').value,
     estado:document.getElementById('om-est').value,
     pct:parseInt(document.getElementById('om-pct').value)||0,
     obs:'', // se limpia para el próximo registro
     paralelo:false,
-    conjuntos:(parseInt(document.getElementById('om-pct').value)||0)===100?(document.getElementById('om-conjuntos').value||''):(idx>=0&&op.operaciones[idx]?.conjuntos||'')
+    conjuntos:(parseInt(document.getElementById('om-pct').value)||0)===100?(document.getElementById('om-conjuntos')?.value||''):(idx>=0&&op.operaciones[idx]?.conjuntos||'')
   };
 
   if(idx>=0)op.operaciones[idx]=updated;
@@ -1640,7 +1668,7 @@ function saveOM(){
     if(!stgNow.historial)stgNow.historial=[];
     stgNow.historial.push({ts:new Date().toISOString(),cambios});
   }
-  closeOM();saveST();renderGantt();flash('✅ Operación guardada');
+  closeOM();saveST();renderGantt();renderPers();flash('✅ Operación guardada');
 }
 
 function deleteStg(){
@@ -2918,7 +2946,7 @@ function generarEtapasDesdeConjuntos(op){
       const pc=cfg[p]||{};
       if(pc.persona) procMap[p].personas.add(pc.persona);
       if(pc.start) procMap[p].starts.push(pc.start);
-      if(pc.start&&pc.dias) procMap[p].ends.push(addHab(pc.start,parseInt(pc.dias)||1));
+      if(pc.start&&pc.dias) procMap[p].ends.push(pc.durationUnit==='hours'?workEnd(pc.start,pc):addHab(pc.start,parseInt(pc.dias)||1));
       procMap[p].pcts.push(pc.estado==='listo'?100:pc.estado==='proceso'?50:0);
     });
   });
@@ -3004,7 +3032,8 @@ function asignarPendiente(opId, cjIdx, proc, personaId, startDate, dias){
   if(!cj.procConfig[proc])cj.procConfig[proc]={};
   cj.procConfig[proc].persona=personaId;
   cj.procConfig[proc].start=startDate||TD;
-  cj.procConfig[proc].dias=parseInt(dias)||1;
+  if(cj.procConfig[proc].durationUnit!=='hours')cj.procConfig[proc].dias=parseInt(dias)||1;
+  if(cj.procConfig[proc].durationUnit==='hours')cj.procConfig[proc].end=workEnd(cj.procConfig[proc].start,cj.procConfig[proc]);
   cj.procConfig[proc].estado='proceso';
   // Recalcular avance del conjunto
   const procs=cj.procesos||[];
@@ -3243,40 +3272,14 @@ function renderAsignacion(){
     }
   });
 
-  // Mapa persona → día → tareas con horas
+  // Fuente única: cada proceso de conjunto se cuenta una vez.
   const pdh={};
-  ST.ops.forEach(op=>{
-    // Etapas tradicionales
-    (op.operaciones||[]).forEach(stg=>{
-      const pers=stgPers(stg);
-      if(!pers.length||!stg.start||!stg.end)return;
-      const days=daysRange(stg.start,stg.end).filter(d=>!isWE(d));
-      const hpd=days.length?Math.round(stg.dias*8/(days.length*(pers.length||1))*10)/10:0;
-      pers.forEach(pid=>{
-        if(!pdh[pid])pdh[pid]={};
-        days.forEach(day=>{
-          if(!pdh[pid][day])pdh[pid][day]=[];
-          pdh[pid][day].push({op,stg,h:hpd,tipo:'etapa'});
-        });
-      });
-    });
-    // Operaciones de conjuntos asignadas
-    (op.conjuntos||[]).forEach((cj,ci)=>{
-      (cj.procesos||[]).forEach(proc=>{
-        const pc=(cj.procConfig||{})[proc]||{};
-        if(!pc.persona||!pc.start)return;
-        const dias=parseInt(pc.dias)||1;
-        const endDate=addHab(pc.start,dias);
-        const days=daysRange(pc.start,endDate).filter(d=>!isWE(d));
-        const hpd=days.length?Math.round(dias*8/days.length*10)/10:0;
-        if(!pdh[pc.persona])pdh[pc.persona]={};
-        days.forEach(day=>{
-          if(!pdh[pc.persona][day])pdh[pc.persona][day]=[];
-          pdh[pc.persona][day].push({
-            op,stg:{nombre:proc+': '+cj.cod,id:'cj_'+op.id+'_'+ci+'_'+proc},
-            h:hpd,tipo:'conjunto',proc,cjCod:cj.cod,cjDesc:cj.desc
-          });
-        });
+  assignmentEntries().forEach(entry=>{
+    entry.people.forEach(pid=>{
+      if(!pdh[pid])pdh[pid]={};
+      workSlots(entry.task).forEach(({day,h})=>{
+        if(!pdh[pid][day])pdh[pid][day]=[];
+        pdh[pid][day].push({...entry,h,stg:entry.type==='assembly'?{nombre:entry.proc+': '+entry.cj.cod,id:'cj_'+entry.ci}:entry.task});
       });
     });
   });
@@ -3337,52 +3340,6 @@ function renderAsignacion(){
   });
   tbl+='</tbody></table>';
 
-  // Panel lateral
-  // Pendientes de conjuntos — ordenados por prioridad de proceso
-  const pendCj=getPendientesAsignacion('');
-  
-  // Filtro de OP para el panel
-  const filtroOpEl=document.getElementById('asig-fil-op');
-  const filtroOpId=filtroOpEl?.value||'';
-
-  const pendCjFilt=filtroOpId?pendCj.filter(p=>p.opId===filtroOpId):pendCj;
-
-  const panelHTML='<div class="asig-panel-h" style="display:flex;flex-direction:column;gap:5px">'+
-    '<div style="font-size:11px;font-weight:700">🎯 Por asignar</div>'+
-    '<select id="asig-fil-op" style="font-size:10px;padding:3px 5px;border:1px solid var(--line);border-radius:4px;background:#fff" onchange="renderAsignacion()">'+
-      '<option value="">Todas las OPs</option>'+
-      ST.ops.map(op=>'<option value="'+op.id+'"'+(op.id===filtroOpId?' selected':'')+'>OP '+op.op+'</option>').join('')+
-    '</select>'+
-    '</div>'+
-    '<div class="asig-panel-b" id="asig-list">'+
-    // Sección 1: Pendientes de conjuntos
-    (pendCjFilt.length?
-      '<div style="font-size:9px;font-weight:700;color:var(--ink3);text-transform:uppercase;padding:4px 0;margin-bottom:4px;border-bottom:1px solid var(--line2)">Operaciones de conjuntos ('+pendCjFilt.length+')</div>'+
-      pendCjFilt.slice(0,20).map(p=>{
-        const col=PROC_COLORS[p.proc]||'#546e7a';
-        return '<div class="asig-stg" style="border-left:3px solid '+col+'" draggable="true" data-pend-opid="'+p.opId+'" data-pend-cji="'+p.cjIdx+'" data-pend-proc="'+p.proc+'">'+
-          '<div style="display:flex;align-items:center;gap:5px;margin-bottom:2px">'+
-            '<span style="font-size:9px;background:'+col+'22;color:'+col+';padding:1px 5px;border-radius:3px;font-weight:700">'+p.proc+'</span>'+
-            '<span style="font-size:10px;font-weight:600">OP '+p.opNum+'</span>'+
-          '</div>'+
-          '<div style="font-size:10px;color:var(--ink)">'+p.cjCod+(p.cjDesc?' — '+p.cjDesc.substring(0,25):'')+'</div>'+
-        '</div>';
-      }).join('')
-    :'')+
-    // Sección 2: Etapas sin asignar tradicionales
-    (sinAsignar.length?
-      '<div style="font-size:9px;font-weight:700;color:var(--ink3);text-transform:uppercase;padding:4px 0;margin:6px 0 4px;border-bottom:1px solid var(--line2)">Etapas ('+sinAsignar.length+')</div>'+
-      sinAsignar.map(({op,stg})=>
-        '<div class="asig-stg" draggable="true" data-opid="'+op.id+'" data-stgid="'+stg.id+'">'+
-        '<div style="font-weight:600;cursor:pointer;font-size:10px" data-edit-opid="'+op.id+'" data-edit-stgid="'+stg.id+'">'+stg.nombre+'</div>'+
-        '<div class="asig-stg-op">OP '+op.op+' · '+fmtD(stg.start)+' → '+fmtD(stg.end)+'</div>'+
-        (stg.end<TD?'<div style="font-size:9px;color:var(--r);font-weight:700">DEMORADA</div>':'')+
-        '</div>'
-      ).join('')
-    :'')+
-    (!pendCjFilt.length&&!sinAsignar.length?'<div style="padding:20px;text-align:center;color:var(--ink3);font-size:11px">✅ Todo asignado</div>':'')+
-    '</div>';
-
   // Construir DOM
   const pb=document.getElementById('p-body');
   pb.innerHTML='';
@@ -3395,35 +3352,45 @@ function renderAsignacion(){
 
   const panel=document.createElement('div');
   panel.className='asig-panel';
-  panel.innerHTML=panelHTML;
+  renderTaskPanel(panel);
 
   wrap.appendChild(cal);
   wrap.appendChild(panel);
   pb.appendChild(wrap);
 
-  // Click en celda ocupada → abrir modal de la etapa
+  // Abrir la tarea exacta, o elegir entre las tareas del mismo día.
   cal.addEventListener('click',e=>{
-    const taskDiv=e.target.closest('[data-opid][data-stgid]');
-    if(taskDiv&&taskDiv.dataset.opid&&taskDiv.dataset.stgid){
-      // Mostrar opción: editar o desasignar
-      const td2=taskDiv.closest('.occ-drop');
-      const pid2=td2?.dataset.pid;
-      openOM(taskDiv.dataset.opid, taskDiv.dataset.stgid);
-      return;
+    const td=e.target.closest('.occ-drop');if(!td)return;
+    const tasks=pdh[td.dataset.pid]?.[td.dataset.day]||[];
+    const open=t=>t.type==='assembly'?openPendingTask(t.op.id,t.ci,t.proc):openOM(t.op.id,t.task.id);
+    if(tasks.length===1){open(tasks[0]);return;}
+    if(tasks.length>1){
+      const dlg=teamDialog('Tareas del día',tasks.map((t,i)=>'<button type="button" data-task="'+i+'">'+teamEscape('OP '+t.op.op+' · '+t.stg.nombre+' · '+t.h+' h')+'</button>').join(''),()=>false);
+      dlg.querySelector('button[type="submit"]').hidden=true;
+      dlg.querySelectorAll('[data-task]').forEach(b=>b.onclick=()=>{dlg.close();open(tasks[Number(b.dataset.task)]);});return;
     }
-    // Click en celda vacía → abrir selector de etapa a asignar
-    const td=e.target.closest('.occ-drop');
-    if(!td) return;
-    const pid=td.dataset.pid;
-    const day=td.dataset.day;
-    if(!pid||!day) return;
-    openAsigSelector(pid, day);
+    openAsigSelector(td.dataset.pid,td.dataset.day);
   });
 
+  let suppressCardClickUntil=0;
+  panel.querySelectorAll('.asig-stg').forEach(card=>{
+    card.tabIndex=0;card.setAttribute('role','button');
+    card.title='Clic para gestionar · Arrastrar para asignar';
+  });
+  function activateTaskCard(e){
+    if(Date.now()<suppressCardClickUntil)return;
+    const card=e.target.closest('.asig-stg');if(!card)return;
+    if(card.dataset.pendOpid)openPendingTask(card.dataset.pendOpid,Number(card.dataset.pendCji),card.dataset.pendProc);
+    else if(card.dataset.opid&&card.dataset.stgid)openOM(card.dataset.opid,card.dataset.stgid);
+  }
+  panel.addEventListener('keydown',e=>{
+    if((e.key==='Enter'||e.key===' ')&&e.target.matches('.asig-stg')){e.preventDefault();activateTaskCard(e);}
+  });
   // Drag desde el panel lateral — etapas y pendientes de conjuntos
   panel.addEventListener('dragstart',e=>{
     const card=e.target.closest('[data-opid],[data-pend-opid]');
     if(!card)return;
+    suppressCardClickUntil=Infinity;
     if(card.dataset.pendOpid){
       // Pendiente de conjunto
       dragStg={
@@ -3439,15 +3406,13 @@ function renderAsignacion(){
     e.dataTransfer.effectAllowed='move';
   });
   panel.addEventListener('dragend',e=>{
+    suppressCardClickUntil=Date.now()+300;
     panel.querySelectorAll('.dragging').forEach(el=>el.classList.remove('dragging'));
     dragStg=null;
   });
 
   // Click en etapa del panel → abrir modal
-  panel.addEventListener('click',e=>{
-    const editDiv=e.target.closest('[data-edit-opid]');
-    if(editDiv) openOM(editDiv.dataset.editOpid, editDiv.dataset.editStgid);
-  });
+  panel.addEventListener('click',activateTaskCard);
 
   // Drop en celdas
   cal.addEventListener('dragover',e=>{
@@ -3495,6 +3460,62 @@ function renderAsignacion(){
 
 
 // Modal selector de etapa para asignar desde celda vacía
+function assignmentEntries(){
+  const result=[];
+  ST.ops.forEach(op=>{
+    (op.operaciones||[]).filter(t=>!t.fromConjuntos).forEach(task=>result.push({op,task,people:stgPers(task),type:'stage'}));
+    (op.conjuntos||[]).forEach((cj,ci)=>(cj.procesos||[]).forEach(proc=>{
+      const pc=cj.procConfig?.[proc]||{};
+      result.push({op,cj,ci,proc,task:pc,people:pc.persona?[pc.persona]:[],type:'assembly'});
+    }));
+  });return result;
+}
+function renderTaskPanel(panel){
+  const state=window.assignmentFilters||(window.assignmentFilters={op:'',status:'unassigned',q:''});
+  const esc=teamEscape;
+  panel.innerHTML='<div class="asig-panel-h"><b>Tareas · buscar y gestionar</b><label style="display:block;margin-top:8px">OP<select id="task-op" class="fi"><option value="">Todas las OPs</option>'+ST.ops.map(op=>'<option value="'+esc(op.id)+'">OP '+esc(op.op)+'</option>').join('')+'</select></label><label style="display:block;margin-top:8px">Asignación<select id="task-status" class="fi"><option value="unassigned">Sin asignar</option><option value="assigned">Asignadas</option><option value="all">Todas</option></select></label><label style="display:block;margin-top:8px">Buscar<input id="task-query" class="fi" type="search" placeholder="Proceso, conjunto, OP o persona"></label></div><div class="asig-panel-b" id="task-results"></div>';
+  const op=panel.querySelector('#task-op'),status=panel.querySelector('#task-status'),query=panel.querySelector('#task-query');
+  op.value=state.op;status.value=state.status;query.value=state.q;
+  function results(){
+    state.op=op.value;state.status=status.value;state.q=query.value;
+    const q=normName(state.q);
+    const entries=assignmentEntries().filter(e=>(!state.op||e.op.id===state.op)&&(state.status==='all'||(e.people.length>0)===(state.status==='assigned'))&&(!q||normName([e.op.op,e.proc,e.task.nombre,e.cj?.cod,e.cj?.desc,...e.people.map(id=>ST.personal.find(p=>p.id===id)?.n||'')].join(' ')).includes(q)));
+    panel.querySelector('#task-results').innerHTML='<p>'+entries.length+' tareas</p>'+entries.map(e=>{
+      const attrs=e.type==='assembly'?'data-pend-opid="'+esc(e.op.id)+'" data-pend-cji="'+e.ci+'" data-pend-proc="'+esc(e.proc)+'"':'data-opid="'+esc(e.op.id)+'" data-stgid="'+esc(e.task.id)+'"';
+      return '<div class="asig-stg" role="button" tabindex="0" draggable="true" '+attrs+' title="Clic para gestionar · Arrastrar para asignar"><b>OP '+esc(e.op.op)+' · '+esc(e.proc||e.task.nombre)+'</b><div>'+esc(e.cj?e.cj.cod+' — '+e.cj.desc:e.task.cod||'')+'</div><small>'+esc(e.people.map(id=>ST.personal.find(p=>p.id===id)?.n||id).join(', ')||'Sin asignar')+(e.task.durationUnit==='hours'?' · '+esc(e.task.workHours)+' h':'')+'</small></div>';
+    }).join('')+(entries.length?'':'<p>No hay tareas para estos filtros.</p>');
+  }
+  op.onchange=status.onchange=query.oninput=results;results();
+}
+
+function openPendingTask(opId,cjIdx,proc){
+  const op=ST.ops.find(o=>o.id===opId),cj=op?.conjuntos?.[cjIdx];
+  if(!cj||!(cj.procesos||[]).includes(proc)){flash('La tarea ya no está disponible.');return;}
+  const pc=cj.procConfig?.[proc]||{};
+  const people=ST.personal.filter(p=>p.activo!==false||p.id===pc.persona);
+  teamDialog('Gestionar tarea',
+    '<p><b>OP:</b> '+teamEscape(op.op)+' · <b>Proceso:</b> '+teamEscape(proc)+'<br><b>Conjunto:</b> '+teamEscape(cj.cod)+'<br>'+teamEscape(cj.desc)+'</p>'+
+    '<label>Persona asignada<select name="person"><option value="">Sin asignar</option>'+people.map(p=>'<option value="'+teamEscape(p.id)+'"'+(p.id===pc.persona?' selected':'')+'>'+teamEscape(p.n)+'</option>').join('')+'</select></label>'+
+    '<div class="team-fields"><label>Fecha de inicio<input type="date" name="start" required value="'+teamEscape(pc.start||TD)+'"></label><label>Duración de trabajo<input type="number" min="0.01" step="any" name="days" required value="'+(pc.durationUnit==='hours'?pc.workHours:Number(pc.dias)||1)+'"></label><label>Unidad<select name="unit"><option value="hours"'+(pc.durationUnit==='hours'?' selected':'')+'>Horas</option><option value="days"'+(pc.durationUnit!=='hours'?' selected':'')+'>Días hábiles</option></select></label></div><p>Horas por persona para este proceso de este conjunto. Jornada de 8 h; por ejemplo, 10 h se distribuyen en 8 h + 2 h, sin fines de semana.</p>'+
+    '<label>Estado<select name="status">'+[['pendiente','Pendiente'],['proceso','En proceso'],['listo','Terminado']].map(([v,l])=>'<option value="'+v+'"'+((pc.estado||'pendiente')===v?' selected':'')+'>'+l+'</option>').join('')+'</select></label>'+
+    '<label>Observaciones<input name="notes" value="'+teamEscape(pc.obs||'')+'"></label><p>Elegí «Sin asignar» para quitar la persona. Cancelar no modifica la tarea.</p>',data=>{
+      const duration=workDuration(data.get('days'),data.get('unit')),person=data.get('person');
+      if(!data.get('start'))throw Error('Revisá la fecha de inicio.');
+      if(person&&!ST.personal.some(p=>p.id===person&&(p.activo!==false||p.id===pc.persona)))throw Error('La persona ya no está disponible.');
+      teamCommit(next=>{
+        const current=next.ops.find(o=>o.id===opId),target=current?.conjuntos?.[cjIdx];
+        if(!target||target.cod!==cj.cod||!(target.procesos||[]).includes(proc))throw Error('El conjunto cambió. Cerrá y volvé a abrir la tarea.');
+        target.procConfig=target.procConfig||{};
+        target.procConfig[proc]={...(target.procConfig[proc]||{}),persona:person||null,start:data.get('start'),...duration,end:workEnd(data.get('start'),duration),estado:data.get('status'),obs:data.get('notes').trim()};
+        const done=target.procesos.filter(p=>target.procConfig[p]?.estado==='listo').length;
+        target.pct=Math.round(done/target.procesos.length*100);target.estado=target.pct===100?'terminado':target.pct?'proceso':'pendiente';
+        const metadata=new Map((current.operaciones||[]).filter(t=>t.fromConjuntos).map(t=>[t.id,{obs:t.obs,historial:t.historial}]));
+        generarEtapasDesdeConjuntos(current);
+        for(const t of current.operaciones)if(metadata.has(t.id))Object.assign(t,metadata.get(t.id));
+      });
+    });
+}
+
 function openAsigSelector(pid, day){
   const per=ST.personal.find(p=>p.id===pid);
   const sinAsignar=[];
