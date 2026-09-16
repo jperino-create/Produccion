@@ -1044,6 +1044,11 @@ function openAccModal(type,val){
 // ============================================================
 const CW_PX=24,LW=310;
 function renderGantt(){
+  // Preservar la posición de scroll — reconstruir el Gantt no debería "saltar" al principio
+  // cada vez que se edita/asigna una tarea.
+  const _gPrevScroll=document.getElementById('g-scroll');
+  const _gScrollTop=_gPrevScroll?_gPrevScroll.scrollTop:0;
+  const _gScrollLeft=_gPrevScroll?_gPrevScroll.scrollLeft:0;
   const fe=document.getElementById('g-fe').value;
   const ops=ST.ops.filter(o=>!fe||o.est===fe);
   if(!ops.length){
@@ -1164,6 +1169,7 @@ function renderGantt(){
     h+='</tbody></table>';
     const scroll=document.getElementById('g-scroll');
     scroll.innerHTML=h;
+    if(_gScrollTop||_gScrollLeft){scroll.scrollTop=_gScrollTop;scroll.scrollLeft=_gScrollLeft;}
     initRowDrag();
     renderAlerts();
     return;
@@ -1297,6 +1303,7 @@ function renderGantt(){
   h+='</tbody></table>';
   const scroll=document.getElementById('g-scroll');
   scroll.innerHTML=h;
+  if(_gScrollTop||_gScrollLeft){scroll.scrollTop=_gScrollTop;scroll.scrollLeft=_gScrollLeft;}
   scroll._barDragInit=false;
   scroll._rowDragInit=false;
   setTimeout(()=>{initBarDrag();initRowDrag();},50);
@@ -3394,12 +3401,12 @@ function renderAsignacion(){
   sinAsignar.sort((a,b)=>a.stg.start<b.stg.start?-1:1);
   // Construir tabla
   let tbl='<table style="border-collapse:collapse;min-width:max-content;font-size:11px"><thead>';
-  tbl+='<tr><th style="position:sticky;left:0;z-index:4;background:var(--paper);min-width:160px;padding:5px 10px;text-align:left;border:1px solid var(--line)" rowspan="2">Persona</th>';
-  wgArr.forEach(wg=>tbl+='<th colspan="'+wg.days.length+'" style="text-align:center;background:var(--paper);border:1px solid var(--line);font-size:9px;font-weight:700;color:var(--ink3)">Sem '+wg.w+'</th>');
+  tbl+='<tr><th style="position:sticky;left:0;top:0;z-index:6;height:22px;background:var(--paper);min-width:160px;padding:5px 10px;text-align:left;border:1px solid var(--line)" rowspan="2">Persona</th>';
+  wgArr.forEach(wg=>tbl+='<th colspan="'+wg.days.length+'" style="position:sticky;top:0;z-index:5;height:22px;text-align:center;background:var(--paper);border:1px solid var(--line);font-size:9px;font-weight:700;color:var(--ink3)">Sem '+wg.w+'</th>');
   tbl+='</tr><tr>';
   allDays.forEach(d=>{
     const iT=d.d===TD;
-    tbl+='<th style="width:64px;min-width:64px;padding:3px 2px;font-size:9px;text-align:center;background:'+(iT?'var(--g3)':'var(--paper)')+';color:'+(iT?'var(--g)':'var(--ink3)')+';border:1px solid var(--line)">'+d.day+'<br><span style="font-size:8px;font-weight:400">'+d.d.slice(8)+'/'+d.d.slice(5,7)+'</span></th>';
+    tbl+='<th style="position:sticky;top:22px;z-index:5;width:64px;min-width:64px;height:32px;padding:3px 2px;font-size:9px;text-align:center;background:'+(iT?'var(--g3)':'var(--paper)')+';color:'+(iT?'var(--g)':'var(--ink3)')+';border:1px solid var(--line)">'+d.day+'<br><span style="font-size:8px;font-weight:400">'+d.d.slice(8)+'/'+d.d.slice(5,7)+'</span></th>';
   });
   tbl+='</tr></thead><tbody>';
   Object.entries(areas).forEach(([akey,av])=>{
@@ -3480,8 +3487,12 @@ function renderAsignacion(){
     :'')+
     (!pendCjFilt.length&&!sinAsignar.length?'<div style="padding:20px;text-align:center;color:var(--ink3);font-size:11px">✅ Todo asignado</div>':'')+
     '</div>';
-  // Construir DOM
+  // Construir DOM — se preserva la posición de scroll para no "saltar" al primer operario
+  // cada vez que se asigna/edita una tarea y este panel se vuelve a dibujar.
   const pb=document.getElementById('p-body');
+  const prevCal=pb.querySelector('.asig-cal');
+  const prevScrollTop=prevCal?prevCal.scrollTop:0;
+  const prevScrollLeft=prevCal?prevCal.scrollLeft:0;
   pb.innerHTML='';
   const wrap=document.createElement('div');
   wrap.className='asig-wrap';
@@ -3494,6 +3505,7 @@ function renderAsignacion(){
   wrap.appendChild(cal);
   wrap.appendChild(panel);
   pb.appendChild(wrap);
+  if(prevScrollTop||prevScrollLeft){cal.scrollTop=prevScrollTop;cal.scrollLeft=prevScrollLeft;}
   // Click en celda ocupada → abrir modal de la etapa (o el gestor de tareas si hay varias)
   cal.addEventListener('click',e=>{
     const taskDiv=e.target.closest('[data-opid][data-stgid]');
